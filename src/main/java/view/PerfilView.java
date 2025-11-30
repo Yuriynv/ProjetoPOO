@@ -2,6 +2,8 @@ package view;
 
 import dao.PerfilDAO;
 import model.Perfil;
+import model.Usuario;
+import util.PermissoesUtil;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -10,9 +12,11 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
-// Tela de CRUD de Perfis
-public class PerfilView extends JFrame 
-{
+/**
+ * Tela de CRUD de Perfis
+ */
+public class PerfilView extends JFrame {
+    
     private JTable tabelaPerfis;
     private DefaultTableModel modeloTabela;
     private JTextField txtNomePerfil, txtDescricao, txtPermissoes;
@@ -20,17 +24,18 @@ public class PerfilView extends JFrame
     
     private PerfilDAO perfilDAO;
     private Perfil perfilSelecionado;
+    private Usuario usuarioLogado; // Usuário que está usando o sistema
     private boolean modoEdicao = false;
     
-    public PerfilView() 
-    {
+    public PerfilView(Usuario usuarioLogado) {
+        this.usuarioLogado = usuarioLogado;
         perfilDAO = new PerfilDAO();
         inicializarComponentes();
         carregarPerfis();
+        aplicarPermissoes(); // Apenas administradores podem gerenciar perfis
     }
     
-    private void inicializarComponentes() 
-    {
+    private void inicializarComponentes() {
         setTitle("Gerenciamento de Perfis");
         setSize(800, 500);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -53,8 +58,7 @@ public class PerfilView extends JFrame
         habilitarCampos(false);
     }
     
-    private JPanel criarPainelFormulario() 
-    {
+    private JPanel criarPainelFormulario() {
         JPanel painel = new JPanel();
         painel.setLayout(new GridBagLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Dados do Perfil"));
@@ -96,8 +100,7 @@ public class PerfilView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelTabela() 
-    {
+    private JPanel criarPainelTabela() {
         JPanel painel = new JPanel(new BorderLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Perfis Cadastrados"));
         
@@ -125,8 +128,7 @@ public class PerfilView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelBotoes() 
-    {
+    private JPanel criarPainelBotoes() {
         JPanel painel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         
         btnNovo = new JButton("Novo");
@@ -152,19 +154,15 @@ public class PerfilView extends JFrame
         return painel;
     }
     
-    private void carregarPerfis() 
-    {
-        try 
-        {
+    private void carregarPerfis() {
+        try {
             List<Perfil> perfis = perfilDAO.listarTodos();
             modeloTabela.setRowCount(0);
             
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
             
-            for (Perfil perfil : perfis) 
-            {
-                Object[] linha = 
-                {
+            for (Perfil perfil : perfis) {
+                Object[] linha = {
                     perfil.getId(),
                     perfil.getNomePerfil(),
                     perfil.getDescricao(),
@@ -174,9 +172,7 @@ public class PerfilView extends JFrame
                 modeloTabela.addRow(linha);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao carregar perfis: " + ex.getMessage(),
                 "Erro",
@@ -184,8 +180,7 @@ public class PerfilView extends JFrame
         }
     }
     
-    private void novo() 
-    {
+    private void novo() {
         limparCampos();
         habilitarCampos(true);
         modoEdicao = false;
@@ -193,15 +188,12 @@ public class PerfilView extends JFrame
         txtNomePerfil.requestFocus();
     }
     
-    private void salvar() 
-    {
-        if (!validarCampos()) 
-        {
+    private void salvar() {
+        if (!validarCampos()) {
             return;
         }
         
-        try 
-        {
+        try {
             Perfil perfil = new Perfil();
             perfil.setNomePerfil(txtNomePerfil.getText().trim());
             perfil.setDescricao(txtDescricao.getText().trim());
@@ -209,18 +201,14 @@ public class PerfilView extends JFrame
             
             boolean sucesso;
             
-            if (modoEdicao) 
-            {
+            if (modoEdicao) {
                 perfil.setId(perfilSelecionado.getId());
                 sucesso = perfilDAO.atualizar(perfil);
-            } 
-            else 
-            {
+            } else {
                 sucesso = perfilDAO.inserir(perfil);
             }
             
-            if (sucesso) 
-            {
+            if (sucesso) {
                 JOptionPane.showMessageDialog(this,
                     "Perfil salvo com sucesso!",
                     "Sucesso",
@@ -228,18 +216,14 @@ public class PerfilView extends JFrame
                 
                 carregarPerfis();
                 cancelar();
-            } 
-            else 
-            {
+            } else {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao salvar perfil!",
                     "Erro",
                     JOptionPane.ERROR_MESSAGE);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao salvar perfil: " + ex.getMessage(),
                 "Erro",
@@ -247,12 +231,10 @@ public class PerfilView extends JFrame
         }
     }
     
-    private void editar() 
-    {
+    private void editar() {
         int linhaSelecionada = tabelaPerfis.getSelectedRow();
         
-        if (linhaSelecionada == -1) 
-        {
+        if (linhaSelecionada == -1) {
             JOptionPane.showMessageDialog(this,
                 "Selecione um perfil para editar!",
                 "Aviso",
@@ -260,13 +242,11 @@ public class PerfilView extends JFrame
             return;
         }
         
-        try 
-        {
+        try {
             int id = (int) modeloTabela.getValueAt(linhaSelecionada, 0);
             perfilSelecionado = perfilDAO.buscarPorId(id);
             
-            if (perfilSelecionado != null) 
-            {
+            if (perfilSelecionado != null) {
                 txtNomePerfil.setText(perfilSelecionado.getNomePerfil());
                 txtDescricao.setText(perfilSelecionado.getDescricao());
                 txtPermissoes.setText(perfilSelecionado.getPermissoes());
@@ -275,9 +255,7 @@ public class PerfilView extends JFrame
                 modoEdicao = true;
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao buscar perfil: " + ex.getMessage(),
                 "Erro",
@@ -285,12 +263,10 @@ public class PerfilView extends JFrame
         }
     }
     
-    private void excluir() 
-    {
+    private void excluir() {
         int linhaSelecionada = tabelaPerfis.getSelectedRow();
         
-        if (linhaSelecionada == -1) 
-        {
+        if (linhaSelecionada == -1) {
             JOptionPane.showMessageDialog(this,
                 "Selecione um perfil para excluir!",
                 "Aviso",
@@ -303,32 +279,25 @@ public class PerfilView extends JFrame
             "Confirmar Exclusão",
             JOptionPane.YES_NO_OPTION);
         
-        if (opcao == JOptionPane.YES_OPTION) 
-        {
-            try 
-            {
+        if (opcao == JOptionPane.YES_OPTION) {
+            try {
                 int id = (int) modeloTabela.getValueAt(linhaSelecionada, 0);
                 
-                if (perfilDAO.excluir(id)) 
-                {
+                if (perfilDAO.excluir(id)) {
                     JOptionPane.showMessageDialog(this,
                         "Perfil excluído com sucesso!",
                         "Sucesso",
                         JOptionPane.INFORMATION_MESSAGE);
                     
                     carregarPerfis();
-                } 
-                else 
-                {
+                } else {
                     JOptionPane.showMessageDialog(this,
                         "Erro ao excluir perfil!",
                         "Erro",
                         JOptionPane.ERROR_MESSAGE);
                 }
                 
-            } 
-            catch (SQLException ex) 
-            {
+            } catch (SQLException ex) {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao excluir perfil: " + ex.getMessage(),
                     "Erro",
@@ -337,8 +306,7 @@ public class PerfilView extends JFrame
         }
     }
     
-    private void cancelar() 
-    {
+    private void cancelar() {
         limparCampos();
         habilitarCampos(false);
         modoEdicao = false;
@@ -346,17 +314,14 @@ public class PerfilView extends JFrame
         tabelaPerfis.clearSelection();
     }
     
-    private boolean validarCampos() 
-    {
-        if (txtNomePerfil.getText().trim().isEmpty()) 
-        {
+    private boolean validarCampos() {
+        if (txtNomePerfil.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe o nome do perfil!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtNomePerfil.requestFocus();
             return false;
         }
         
-        if (txtDescricao.getText().trim().isEmpty()) 
-        {
+        if (txtDescricao.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe a descrição!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtDescricao.requestFocus();
             return false;
@@ -365,19 +330,35 @@ public class PerfilView extends JFrame
         return true;
     }
     
-    private void limparCampos() 
-    {
+    private void limparCampos() {
         txtNomePerfil.setText("");
         txtDescricao.setText("");
         txtPermissoes.setText("");
     }
     
-    private void habilitarCampos(boolean habilitar) 
-    {
+    private void habilitarCampos(boolean habilitar) {
         txtNomePerfil.setEnabled(habilitar);
         txtDescricao.setEnabled(habilitar);
         txtPermissoes.setEnabled(habilitar);
         btnSalvar.setEnabled(habilitar);
         btnCancelar.setEnabled(habilitar);
+    }
+    
+    /**
+     * Aplica permissões - apenas administradores podem gerenciar perfis
+     */
+    private void aplicarPermissoes() {
+        if (!PermissoesUtil.isAdministrador(usuarioLogado)) {
+            // Desabilita todos os botões exceto visualização
+            btnNovo.setEnabled(false);
+            btnEditar.setEnabled(false);
+            btnExcluir.setEnabled(false);
+            setTitle("Visualização de Perfis (Somente Leitura)");
+            
+            JOptionPane.showMessageDialog(this,
+                "Você não tem permissão para gerenciar perfis!\nApenas Administradores podem editar perfis.",
+                "Acesso Restrito",
+                JOptionPane.WARNING_MESSAGE);
+        }
     }
 }

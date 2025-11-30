@@ -4,6 +4,7 @@ import dao.PerfilDAO;
 import dao.UsuarioDAO;
 import model.Perfil;
 import model.Usuario;
+import util.PermissoesUtil;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -12,9 +13,11 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
-// CRUD
-public class UsuarioView extends JFrame 
-{
+/**
+ * Tela de CRUD de Usuários
+ */
+public class UsuarioView extends JFrame {
+    
     private JTable tabelaUsuarios;
     private DefaultTableModel modeloTabela;
     private JTextField txtNome, txtEmail, txtSenha;
@@ -24,19 +27,20 @@ public class UsuarioView extends JFrame
     private UsuarioDAO usuarioDAO;
     private PerfilDAO perfilDAO;
     private Usuario usuarioSelecionado;
+    private Usuario usuarioLogado; // Usuário que está usando o sistema
     private boolean modoEdicao = false;
     
-    public UsuarioView() 
-    {
+    public UsuarioView(Usuario usuarioLogado) {
+        this.usuarioLogado = usuarioLogado;
         usuarioDAO = new UsuarioDAO();
         perfilDAO = new PerfilDAO();
         inicializarComponentes();
         carregarUsuarios();
         carregarPerfis();
+        aplicarPermissoes(); // Controla acesso aos botões
     }
     
-    private void inicializarComponentes() 
-    {
+    private void inicializarComponentes() {
         setTitle("Gerenciamento de Usuários");
         setSize(900, 600);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -61,8 +65,7 @@ public class UsuarioView extends JFrame
         habilitarCampos(false);
     }
     
-    private JPanel criarPainelFormulario() 
-    {
+    private JPanel criarPainelFormulario() {
         JPanel painel = new JPanel();
         painel.setLayout(new GridBagLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Dados do Usuário"));
@@ -105,18 +108,15 @@ public class UsuarioView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelTabela() 
-    {
+    private JPanel criarPainelTabela() {
         JPanel painel = new JPanel(new BorderLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Usuários Cadastrados"));
         
         // Modelo da tabela
         String[] colunas = {"ID", "Nome", "Email", "Perfil", "Data Cadastro"};
-        modeloTabela = new DefaultTableModel(colunas, 0) 
-        {
+        modeloTabela = new DefaultTableModel(colunas, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) 
-            {
+            public boolean isCellEditable(int row, int column) {
                 return false;
             }
         };
@@ -138,8 +138,7 @@ public class UsuarioView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelBotoes() 
-    {
+    private JPanel criarPainelBotoes() {
         JPanel painel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         
         btnNovo = new JButton("Novo");
@@ -165,19 +164,15 @@ public class UsuarioView extends JFrame
         return painel;
     }
     
-    private void carregarUsuarios() 
-    {
-        try 
-        {
+    private void carregarUsuarios() {
+        try {
             List<Usuario> usuarios = usuarioDAO.listarTodos();
             modeloTabela.setRowCount(0);
             
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
             
-            for (Usuario usuario : usuarios) 
-            {
-                Object[] linha = 
-                {
+            for (Usuario usuario : usuarios) {
+                Object[] linha = {
                     usuario.getId(),
                     usuario.getNome(),
                     usuario.getEmail(),
@@ -187,9 +182,7 @@ public class UsuarioView extends JFrame
                 modeloTabela.addRow(linha);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao carregar usuários: " + ex.getMessage(),
                 "Erro",
@@ -197,21 +190,16 @@ public class UsuarioView extends JFrame
         }
     }
     
-    private void carregarPerfis() 
-    {
-        try 
-        {
+    private void carregarPerfis() {
+        try {
             List<Perfil> perfis = perfilDAO.listarTodos();
             comboPerfil.removeAllItems();
             
-            for (Perfil perfil : perfis) 
-            {
+            for (Perfil perfil : perfis) {
                 comboPerfil.addItem(perfil);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao carregar perfis: " + ex.getMessage(),
                 "Erro",
@@ -219,8 +207,7 @@ public class UsuarioView extends JFrame
         }
     }
     
-    private void novo() 
-    {
+    private void novo() {
         limparCampos();
         habilitarCampos(true);
         modoEdicao = false;
@@ -228,16 +215,13 @@ public class UsuarioView extends JFrame
         txtNome.requestFocus();
     }
     
-    private void salvar() 
-    {
+    private void salvar() {
         // Validações
-        if (!validarCampos()) 
-        {
+        if (!validarCampos()) {
             return;
         }
         
-        try 
-        {
+        try {
             Usuario usuario = new Usuario();
             usuario.setNome(txtNome.getText().trim());
             usuario.setEmail(txtEmail.getText().trim());
@@ -248,19 +232,15 @@ public class UsuarioView extends JFrame
             
             boolean sucesso;
             
-            if (modoEdicao) 
-            {
+            if (modoEdicao) {
                 usuario.setId(usuarioSelecionado.getId());
                 boolean atualizarSenha = !txtSenha.getText().isEmpty();
                 sucesso = usuarioDAO.atualizar(usuario, atualizarSenha);
-            } 
-            else 
-            {
+            } else {
                 sucesso = usuarioDAO.inserir(usuario);
             }
             
-            if (sucesso) 
-            {
+            if (sucesso) {
                 JOptionPane.showMessageDialog(this,
                     "Usuário salvo com sucesso!",
                     "Sucesso",
@@ -268,18 +248,14 @@ public class UsuarioView extends JFrame
                 
                 carregarUsuarios();
                 cancelar();
-            } 
-            else 
-            {
+            } else {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao salvar usuário!",
                     "Erro",
                     JOptionPane.ERROR_MESSAGE);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao salvar usuário: " + ex.getMessage(),
                 "Erro",
@@ -287,12 +263,10 @@ public class UsuarioView extends JFrame
         }
     }
     
-    private void editar() 
-    {
+    private void editar() {
         int linhaSelecionada = tabelaUsuarios.getSelectedRow();
         
-        if (linhaSelecionada == -1) 
-        {
+        if (linhaSelecionada == -1) {
             JOptionPane.showMessageDialog(this,
                 "Selecione um usuário para editar!",
                 "Aviso",
@@ -300,22 +274,18 @@ public class UsuarioView extends JFrame
             return;
         }
         
-        try 
-        {
+        try {
             int id = (int) modeloTabela.getValueAt(linhaSelecionada, 0);
             usuarioSelecionado = usuarioDAO.buscarPorId(id);
             
-            if (usuarioSelecionado != null) 
-            {
+            if (usuarioSelecionado != null) {
                 txtNome.setText(usuarioSelecionado.getNome());
                 txtEmail.setText(usuarioSelecionado.getEmail());
                 txtSenha.setText(""); // Não mostra senha
                 
                 // Seleciona perfil
-                for (int i = 0; i < comboPerfil.getItemCount(); i++) 
-                {
-                    if (comboPerfil.getItemAt(i).getId() == usuarioSelecionado.getIdPerfil()) 
-                    {
+                for (int i = 0; i < comboPerfil.getItemCount(); i++) {
+                    if (comboPerfil.getItemAt(i).getId() == usuarioSelecionado.getIdPerfil()) {
                         comboPerfil.setSelectedIndex(i);
                         break;
                     }
@@ -325,9 +295,7 @@ public class UsuarioView extends JFrame
                 modoEdicao = true;
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao buscar usuário: " + ex.getMessage(),
                 "Erro",
@@ -369,9 +337,7 @@ public class UsuarioView extends JFrame
                         JOptionPane.ERROR_MESSAGE);
                 }
                 
-            } 
-            catch (SQLException ex) 
-            {
+            } catch (SQLException ex) {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao excluir usuário: " + ex.getMessage(),
                     "Erro",
@@ -380,8 +346,7 @@ public class UsuarioView extends JFrame
         }
     }
     
-    private void cancelar() 
-    {
+    private void cancelar() {
         limparCampos();
         habilitarCampos(false);
         modoEdicao = false;
@@ -389,45 +354,38 @@ public class UsuarioView extends JFrame
         tabelaUsuarios.clearSelection();
     }
     
-    private boolean validarCampos() 
-    {
-        if (txtNome.getText().trim().isEmpty()) 
-        {
+    private boolean validarCampos() {
+        if (txtNome.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe o nome!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtNome.requestFocus();
             return false;
         }
         
-        if (txtEmail.getText().trim().isEmpty()) 
-        {
+        if (txtEmail.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe o email!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtEmail.requestFocus();
             return false;
         }
         
-        if (!txtEmail.getText().contains("@")) 
-        {
+        if (!txtEmail.getText().contains("@")) {
             JOptionPane.showMessageDialog(this, "Email inválido!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtEmail.requestFocus();
             return false;
         }
         
-        if (!modoEdicao && txtSenha.getText().isEmpty()) 
-        {
+        if (!modoEdicao && txtSenha.getText().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe a senha!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtSenha.requestFocus();
             return false;
         }
         
-        if (!txtSenha.getText().isEmpty() && txtSenha.getText().length() < 6) 
-        {
+        if (!txtSenha.getText().isEmpty() && txtSenha.getText().length() < 6) {
             JOptionPane.showMessageDialog(this, "Senha deve ter no mínimo 6 caracteres!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtSenha.requestFocus();
             return false;
         }
         
-        if (comboPerfil.getSelectedItem() == null) 
-        {
+        if (comboPerfil.getSelectedItem() == null) {
             JOptionPane.showMessageDialog(this, "Selecione um perfil!", "Aviso", JOptionPane.WARNING_MESSAGE);
             return false;
         }
@@ -435,24 +393,51 @@ public class UsuarioView extends JFrame
         return true;
     }
     
-    private void limparCampos() 
-    {
+    private void limparCampos() {
         txtNome.setText("");
         txtEmail.setText("");
         txtSenha.setText("");
-        if (comboPerfil.getItemCount() > 0) 
-        {
+        if (comboPerfil.getItemCount() > 0) {
             comboPerfil.setSelectedIndex(0);
         }
     }
     
-    private void habilitarCampos(boolean habilitar) 
-    {
+    private void habilitarCampos(boolean habilitar) {
         txtNome.setEnabled(habilitar);
         txtEmail.setEnabled(habilitar);
         txtSenha.setEnabled(habilitar);
         comboPerfil.setEnabled(habilitar);
         btnSalvar.setEnabled(habilitar);
         btnCancelar.setEnabled(habilitar);
+    }
+    
+    /**
+     * Aplica permissões aos botões baseado no perfil do usuário logado
+     */
+    private void aplicarPermissoes() {
+        // Botão Novo - precisa permissão CRIAR
+        if (!PermissoesUtil.podeCriar(usuarioLogado)) {
+            btnNovo.setEnabled(false);
+            btnNovo.setToolTipText("Você não tem permissão para criar usuários");
+        }
+        
+        // Botão Editar - precisa permissão ATUALIZAR
+        if (!PermissoesUtil.podeAtualizar(usuarioLogado)) {
+            btnEditar.setEnabled(false);
+            btnEditar.setToolTipText("Você não tem permissão para editar usuários");
+        }
+        
+        // Botão Excluir - precisa permissão EXCLUIR
+        if (!PermissoesUtil.podeExcluir(usuarioLogado)) {
+            btnExcluir.setEnabled(false);
+            btnExcluir.setToolTipText("Você não tem permissão para excluir usuários");
+        }
+        
+        // Visitantes só podem visualizar
+        if (!PermissoesUtil.podeCriar(usuarioLogado) && 
+            !PermissoesUtil.podeAtualizar(usuarioLogado) && 
+            !PermissoesUtil.podeExcluir(usuarioLogado)) {
+            setTitle("Visualização de Usuários (Somente Leitura)");
+        }
     }
 }

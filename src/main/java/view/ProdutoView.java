@@ -2,6 +2,8 @@ package view;
 
 import dao.ProdutoDAO;
 import model.Produto;
+import model.Usuario;
+import util.PermissoesUtil;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -11,9 +13,10 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
-// Tela de CRUD de Produtos
-public class ProdutoView extends JFrame 
-{
+/**
+ * Tela de CRUD de Produtos
+ */
+public class ProdutoView extends JFrame {
     
     private JTable tabelaProdutos;
     private DefaultTableModel modeloTabela;
@@ -22,17 +25,18 @@ public class ProdutoView extends JFrame
     
     private ProdutoDAO produtoDAO;
     private Produto produtoSelecionado;
+    private Usuario usuarioLogado; // Usuário que está usando o sistema
     private boolean modoEdicao = false;
     
-    public ProdutoView() 
-    {
+    public ProdutoView(Usuario usuarioLogado) {
+        this.usuarioLogado = usuarioLogado;
         produtoDAO = new ProdutoDAO();
         inicializarComponentes();
         carregarProdutos();
+        aplicarPermissoes(); // Controla acesso aos botões
     }
     
-    private void inicializarComponentes() 
-    {
+    private void inicializarComponentes() {
         setTitle("Gerenciamento de Produtos");
         setSize(900, 600);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -55,8 +59,7 @@ public class ProdutoView extends JFrame
         habilitarCampos(false);
     }
     
-    private JPanel criarPainelFormulario() 
-    {
+    private JPanel criarPainelFormulario() {
         JPanel painel = new JPanel();
         painel.setLayout(new GridBagLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Dados do Produto"));
@@ -99,17 +102,14 @@ public class ProdutoView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelTabela() 
-    {
+    private JPanel criarPainelTabela() {
         JPanel painel = new JPanel(new BorderLayout());
         painel.setBorder(BorderFactory.createTitledBorder("Produtos Cadastrados"));
         
         String[] colunas = {"ID", "Nome", "Descrição", "Preço (R$)", "Quantidade", "Data Cadastro"};
-        modeloTabela = new DefaultTableModel(colunas, 0) 
-        {
+        modeloTabela = new DefaultTableModel(colunas, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) 
-            {
+            public boolean isCellEditable(int row, int column) {
                 return false;
             }
         };
@@ -131,8 +131,7 @@ public class ProdutoView extends JFrame
         return painel;
     }
     
-    private JPanel criarPainelBotoes() 
-    {
+    private JPanel criarPainelBotoes() {
         JPanel painel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         
         btnNovo = new JButton("Novo");
@@ -158,19 +157,15 @@ public class ProdutoView extends JFrame
         return painel;
     }
     
-    private void carregarProdutos() 
-    {
-        try 
-        {
+    private void carregarProdutos() {
+        try {
             List<Produto> produtos = produtoDAO.listarTodos();
             modeloTabela.setRowCount(0);
             
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
             
-            for (Produto produto : produtos) 
-            {
-                Object[] linha = 
-                {
+            for (Produto produto : produtos) {
+                Object[] linha = {
                     produto.getId(),
                     produto.getNome(),
                     produto.getDescricao(),
@@ -181,9 +176,7 @@ public class ProdutoView extends JFrame
                 modeloTabela.addRow(linha);
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao carregar produtos: " + ex.getMessage(),
                 "Erro",
@@ -191,8 +184,7 @@ public class ProdutoView extends JFrame
         }
     }
     
-    private void novo() 
-    {
+    private void novo() {
         limparCampos();
         habilitarCampos(true);
         modoEdicao = false;
@@ -200,15 +192,12 @@ public class ProdutoView extends JFrame
         txtNome.requestFocus();
     }
     
-    private void salvar() 
-    {
-        if (!validarCampos()) 
-        {
+    private void salvar() {
+        if (!validarCampos()) {
             return;
         }
         
-        try 
-        {
+        try {
             Produto produto = new Produto();
             produto.setNome(txtNome.getText().trim());
             produto.setDescricao(txtDescricao.getText().trim());
@@ -220,14 +209,11 @@ public class ProdutoView extends JFrame
             if (modoEdicao) {
                 produto.setId(produtoSelecionado.getId());
                 sucesso = produtoDAO.atualizar(produto);
-            } 
-            else 
-            {
+            } else {
                 sucesso = produtoDAO.inserir(produto);
             }
             
-            if (sucesso) 
-            {
+            if (sucesso) {
                 JOptionPane.showMessageDialog(this,
                     "Produto salvo com sucesso!",
                     "Sucesso",
@@ -235,25 +221,19 @@ public class ProdutoView extends JFrame
                 
                 carregarProdutos();
                 cancelar();
-            } 
-            else 
-            {
+            } else {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao salvar produto!",
                     "Erro",
                     JOptionPane.ERROR_MESSAGE);
             }
             
-        } 
-        catch (NumberFormatException ex) 
-        {
+        } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this,
                 "Formato inválido para preço ou quantidade!",
                 "Erro",
                 JOptionPane.ERROR_MESSAGE);
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao salvar produto: " + ex.getMessage(),
                 "Erro",
@@ -261,12 +241,10 @@ public class ProdutoView extends JFrame
         }
     }
     
-    private void editar() 
-    {
+    private void editar() {
         int linhaSelecionada = tabelaProdutos.getSelectedRow();
         
-        if (linhaSelecionada == -1) 
-        {
+        if (linhaSelecionada == -1) {
             JOptionPane.showMessageDialog(this,
                 "Selecione um produto para editar!",
                 "Aviso",
@@ -274,13 +252,11 @@ public class ProdutoView extends JFrame
             return;
         }
         
-        try 
-        {
+        try {
             int id = (int) modeloTabela.getValueAt(linhaSelecionada, 0);
             produtoSelecionado = produtoDAO.buscarPorId(id);
             
-            if (produtoSelecionado != null) 
-            {
+            if (produtoSelecionado != null) {
                 txtNome.setText(produtoSelecionado.getNome());
                 txtDescricao.setText(produtoSelecionado.getDescricao());
                 txtPreco.setText(produtoSelecionado.getPreco().toString().replace(".", ","));
@@ -290,9 +266,7 @@ public class ProdutoView extends JFrame
                 modoEdicao = true;
             }
             
-        } 
-        catch (SQLException ex) 
-        {
+        } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,
                 "Erro ao buscar produto: " + ex.getMessage(),
                 "Erro",
@@ -300,12 +274,10 @@ public class ProdutoView extends JFrame
         }
     }
     
-    private void excluir() 
-    {
+    private void excluir() {
         int linhaSelecionada = tabelaProdutos.getSelectedRow();
         
-        if (linhaSelecionada == -1) 
-        {
+        if (linhaSelecionada == -1) {
             JOptionPane.showMessageDialog(this,
                 "Selecione um produto para excluir!",
                 "Aviso",
@@ -318,32 +290,25 @@ public class ProdutoView extends JFrame
             "Confirmar Exclusão",
             JOptionPane.YES_NO_OPTION);
         
-        if (opcao == JOptionPane.YES_OPTION) 
-        {
-            try 
-            {
+        if (opcao == JOptionPane.YES_OPTION) {
+            try {
                 int id = (int) modeloTabela.getValueAt(linhaSelecionada, 0);
                 
-                if (produtoDAO.excluir(id)) 
-                {
+                if (produtoDAO.excluir(id)) {
                     JOptionPane.showMessageDialog(this,
                         "Produto excluído com sucesso!",
                         "Sucesso",
                         JOptionPane.INFORMATION_MESSAGE);
                     
                     carregarProdutos();
-                } 
-                else 
-                {
+                } else {
                     JOptionPane.showMessageDialog(this,
                         "Erro ao excluir produto!",
                         "Erro",
                         JOptionPane.ERROR_MESSAGE);
                 }
                 
-            } 
-            catch (SQLException ex) 
-            {
+            } catch (SQLException ex) {
                 JOptionPane.showMessageDialog(this,
                     "Erro ao excluir produto: " + ex.getMessage(),
                     "Erro",
@@ -352,8 +317,7 @@ public class ProdutoView extends JFrame
         }
     }
     
-    private void cancelar() 
-    {
+    private void cancelar() {
         limparCampos();
         habilitarCampos(false);
         modoEdicao = false;
@@ -361,58 +325,46 @@ public class ProdutoView extends JFrame
         tabelaProdutos.clearSelection();
     }
     
-    private boolean validarCampos() 
-    {
-        if (txtNome.getText().trim().isEmpty()) 
-        {
+    private boolean validarCampos() {
+        if (txtNome.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe o nome do produto!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtNome.requestFocus();
             return false;
         }
         
-        if (txtPreco.getText().trim().isEmpty()) 
-        {
+        if (txtPreco.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe o preço!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtPreco.requestFocus();
             return false;
         }
         
-        try 
-        {
+        try {
             BigDecimal preco = new BigDecimal(txtPreco.getText().replace(",", "."));
-            if (preco.compareTo(BigDecimal.ZERO) < 0) 
-            {
+            if (preco.compareTo(BigDecimal.ZERO) < 0) {
                 JOptionPane.showMessageDialog(this, "Preço deve ser maior que zero!", "Aviso", JOptionPane.WARNING_MESSAGE);
                 txtPreco.requestFocus();
                 return false;
             }
-        } 
-        catch (NumberFormatException e) 
-        {
+        } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, "Preço inválido!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtPreco.requestFocus();
             return false;
         }
         
-        if (txtQuantidade.getText().trim().isEmpty()) 
-        {
+        if (txtQuantidade.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Informe a quantidade!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtQuantidade.requestFocus();
             return false;
         }
         
-        try 
-        {
+        try {
             int quantidade = Integer.parseInt(txtQuantidade.getText());
-            if (quantidade < 0) 
-            {
+            if (quantidade < 0) {
                 JOptionPane.showMessageDialog(this, "Quantidade não pode ser negativa!", "Aviso", JOptionPane.WARNING_MESSAGE);
                 txtQuantidade.requestFocus();
                 return false;
             }
-        } 
-        catch (NumberFormatException e) 
-        {
+        } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, "Quantidade inválida!", "Aviso", JOptionPane.WARNING_MESSAGE);
             txtQuantidade.requestFocus();
             return false;
@@ -421,21 +373,49 @@ public class ProdutoView extends JFrame
         return true;
     }
     
-    private void limparCampos() 
-    {
+    private void limparCampos() {
         txtNome.setText("");
         txtDescricao.setText("");
         txtPreco.setText("");
         txtQuantidade.setText("");
     }
     
-    private void habilitarCampos(boolean habilitar) 
-    {
+    private void habilitarCampos(boolean habilitar) {
         txtNome.setEnabled(habilitar);
         txtDescricao.setEnabled(habilitar);
         txtPreco.setEnabled(habilitar);
         txtQuantidade.setEnabled(habilitar);
         btnSalvar.setEnabled(habilitar);
         btnCancelar.setEnabled(habilitar);
+    }
+    
+    /**
+     * Aplica permissões aos botões baseado no perfil do usuário logado
+     */
+    private void aplicarPermissoes() {
+        // Botão Novo - precisa permissão CRIAR
+        if (!PermissoesUtil.podeCriar(usuarioLogado)) {
+            btnNovo.setEnabled(false);
+            btnNovo.setToolTipText("Você não tem permissão para criar produtos");
+        }
+        
+        // Botão Editar - precisa permissão ATUALIZAR
+        if (!PermissoesUtil.podeAtualizar(usuarioLogado)) {
+            btnEditar.setEnabled(false);
+            btnEditar.setToolTipText("Você não tem permissão para editar produtos");
+        }
+        
+        // Botão Excluir - precisa permissão EXCLUIR
+        if (!PermissoesUtil.podeExcluir(usuarioLogado)) {
+            btnExcluir.setEnabled(false);
+            btnExcluir.setToolTipText("Você não tem permissão para excluir produtos");
+        }
+        
+        // Visitantes só podem visualizar
+        if (!PermissoesUtil.podeCriar(usuarioLogado) && 
+            !PermissoesUtil.podeAtualizar(usuarioLogado) && 
+            !PermissoesUtil.podeExcluir(usuarioLogado)) {
+            setTitle("Visualização de Produtos (Somente Leitura)");
+        }
     }
 }

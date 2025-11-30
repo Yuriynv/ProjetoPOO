@@ -1,24 +1,24 @@
 package view;
 
 import model.Usuario;
+import util.PermissoesUtil;
 
 import javax.swing.*;
 import java.awt.*;
 
-// Menu Principal do Sistema
-public class MenuPrincipalView extends JFrame 
-{
+/**
+ * Menu Principal do Sistema
+ */
+public class MenuPrincipalView extends JFrame {
     
     private Usuario usuarioLogado;
     
-    public MenuPrincipalView(Usuario usuario) 
-    {
+    public MenuPrincipalView(Usuario usuario) {
         this.usuarioLogado = usuario;
         inicializarComponentes();
     }
     
-    private void inicializarComponentes() 
-    {
+    private void inicializarComponentes() {
         setTitle("Sistema de Gerenciamento - Menu Principal");
         setSize(600, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -51,18 +51,33 @@ public class MenuPrincipalView extends JFrame
         JButton btnUsuarios = criarBotaoMenu("Gerenciar Usuários", 
             "Cadastrar, editar e excluir usuários do sistema");
         btnUsuarios.addActionListener(e -> abrirTelaUsuarios());
+        // Desabilita se não tiver permissão
+        if (!PermissoesUtil.podeGerenciarUsuarios(usuarioLogado)) {
+            btnUsuarios.setEnabled(false);
+            btnUsuarios.setToolTipText("Você não tem permissão para gerenciar usuários");
+        }
         painelBotoes.add(btnUsuarios);
         
         // Botão Perfis
         JButton btnPerfis = criarBotaoMenu("Gerenciar Perfis", 
             "Cadastrar, editar e excluir perfis de usuário");
         btnPerfis.addActionListener(e -> abrirTelaPerfis());
+        // Apenas administradores podem gerenciar perfis
+        if (!PermissoesUtil.isAdministrador(usuarioLogado)) {
+            btnPerfis.setEnabled(false);
+            btnPerfis.setToolTipText("Apenas administradores podem gerenciar perfis");
+        }
         painelBotoes.add(btnPerfis);
         
         // Botão Produtos
         JButton btnProdutos = criarBotaoMenu("Gerenciar Produtos", 
             "Cadastrar, editar e excluir produtos");
         btnProdutos.addActionListener(e -> abrirTelaProdutos());
+        // Desabilita se não tiver permissão de leitura
+        if (!PermissoesUtil.podeLer(usuarioLogado)) {
+            btnProdutos.setEnabled(false);
+            btnProdutos.setToolTipText("Você não tem permissão para acessar produtos");
+        }
         painelBotoes.add(btnProdutos);
         
         // Botão Sair
@@ -83,8 +98,7 @@ public class MenuPrincipalView extends JFrame
         add(painelPrincipal);
     }
     
-    private JButton criarBotaoMenu(String titulo, String descricao) 
-    {
+    private JButton criarBotaoMenu(String titulo, String descricao) {
         JButton botao = new JButton();
         botao.setLayout(new BorderLayout(10, 5));
         botao.setPreferredSize(new Dimension(500, 60));
@@ -104,33 +118,49 @@ public class MenuPrincipalView extends JFrame
         return botao;
     }
     
-    private void abrirTelaUsuarios() 
-    {
-        UsuarioView telaUsuarios = new UsuarioView();
+    private void abrirTelaUsuarios() {
+        if (!PermissoesUtil.podeGerenciarUsuarios(usuarioLogado)) {
+            JOptionPane.showMessageDialog(this,
+                "Você não tem permissão para gerenciar usuários!",
+                "Acesso Negado",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        UsuarioView telaUsuarios = new UsuarioView(usuarioLogado);
         telaUsuarios.setVisible(true);
     }
     
-    private void abrirTelaPerfis() 
-    {
-        PerfilView telaPerfis = new PerfilView();
+    private void abrirTelaPerfis() {
+        if (!PermissoesUtil.isAdministrador(usuarioLogado)) {
+            JOptionPane.showMessageDialog(this,
+                "Apenas administradores podem gerenciar perfis!",
+                "Acesso Negado",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        PerfilView telaPerfis = new PerfilView(usuarioLogado);
         telaPerfis.setVisible(true);
     }
     
-    private void abrirTelaProdutos() 
-    {
-        ProdutoView telaProdutos = new ProdutoView();
+    private void abrirTelaProdutos() {
+        if (!PermissoesUtil.podeLer(usuarioLogado)) {
+            JOptionPane.showMessageDialog(this,
+                "Você não tem permissão para acessar produtos!",
+                "Acesso Negado",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        ProdutoView telaProdutos = new ProdutoView(usuarioLogado);
         telaProdutos.setVisible(true);
     }
     
-    private void sair() 
-    {
+    private void sair() {
         int opcao = JOptionPane.showConfirmDialog(this,
             "Deseja realmente sair do sistema?",
             "Confirmar Saída",
             JOptionPane.YES_NO_OPTION);
         
-        if (opcao == JOptionPane.YES_OPTION) 
-        {
+        if (opcao == JOptionPane.YES_OPTION) {
             dispose();
             LoginView login = new LoginView();
             login.setVisible(true);
